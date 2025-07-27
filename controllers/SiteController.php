@@ -11,7 +11,6 @@ use Endroid\QrCode\Writer\PngWriter;
 use yii\httpclient\Client;
 
 class SiteController extends Controller {
-
     /**
      * {@inheritdoc}
      */
@@ -32,7 +31,7 @@ class SiteController extends Controller {
         $model = new Url();
 
         return $this->render('index', [
-                    'model' => $model
+            'model' => $model
         ]);
     }
 
@@ -47,18 +46,8 @@ class SiteController extends Controller {
         $existingModel = Url::findOne(['url' => $model->url]);
 
         if ($existingModel) {
-            $qrCode = new QrCode(Yii::$app->urlManager->createAbsoluteUrl(['site/redirect', 'code' => $existingModel->url_code]));
-            $writer = new PngWriter();
-            $qrData = $writer->write($qrCode)->getString();
-
-            return [
-                'success' => true,
-                'short_url' => Yii::$app->urlManager->createAbsoluteUrl(['site/redirect', 'code' => $existingModel->url_code]),
-                'qr_code' => 'data:image/png;base64,' . base64_encode($qrData),
-                'message' => 'Эта ссылка уже была сокращена ранее'
-            ];
+            return $this->generateQRData($existingModel->url_code);
         }
-
 
         $model->url_code = Yii::$app->security->generateRandomString(6);
 
@@ -77,15 +66,7 @@ class SiteController extends Controller {
             ];
         }
 
-        $qrCode = new QrCode(Yii::$app->urlManager->createAbsoluteUrl(['site/redirect', 'code' => $model->url_code]));
-        $writer = new PngWriter();
-        $qrData = $writer->write($qrCode)->getString();
-
-        return [
-            'success' => true,
-            'short_url' => Yii::$app->urlManager->createAbsoluteUrl(['site/redirect', 'code' => $model->url_code]),
-            'qr_code' => 'data:image/png;base64,' . base64_encode($qrData)
-        ];
+        return $this->generateQRData($model->url_code);
     }
 
     public function actionRedirect($code) {
@@ -113,5 +94,17 @@ class SiteController extends Controller {
         } catch (Exception $e) {
             echo $e;
         }
+    }
+
+    public function generateQRData($code) {
+        $qrCode = new QrCode(Yii::$app->urlManager->createAbsoluteUrl(['site/redirect', 'code' => $code]));
+        $writer = new PngWriter();
+        $qrData = $writer->write($qrCode)->getString();
+
+        return [
+            'success' => true,
+            'short_url' => Yii::$app->urlManager->createAbsoluteUrl(['site/redirect', 'code' => $code]),
+            'qr_code' => 'data:image/png;base64,' . base64_encode($qrData)
+        ];
     }
 }
