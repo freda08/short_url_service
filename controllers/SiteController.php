@@ -3,54 +3,23 @@
 namespace app\controllers;
 
 use Yii;
-use yii\filters\AccessControl;
 use yii\web\Controller;
 use yii\web\Response;
-use yii\filters\VerbFilter;
-use app\models\LoginForm;
-use app\models\ContactForm;
+use app\models\Url;
+use Endroid\QrCode\QrCode;
+use Endroid\QrCode\Writer\PngWriter;
+use yii\httpclient\Client;
 
-class SiteController extends Controller
-{
-    /**
-     * {@inheritdoc}
-     */
-    public function behaviors()
-    {
-        return [
-            'access' => [
-                'class' => AccessControl::class,
-                'only' => ['logout'],
-                'rules' => [
-                    [
-                        'actions' => ['logout'],
-                        'allow' => true,
-                        'roles' => ['@'],
-                    ],
-                ],
-            ],
-            'verbs' => [
-                'class' => VerbFilter::class,
-                'actions' => [
-                    'logout' => ['post'],
-                ],
-            ],
-        ];
-    }
+class SiteController extends Controller {
 
     /**
      * {@inheritdoc}
      */
-    public function actions()
-    {
+    public function actions() {
         return [
             'error' => [
                 'class' => 'yii\web\ErrorAction',
-            ],
-            'captcha' => [
-                'class' => 'yii\captcha\CaptchaAction',
-                'fixedVerifyCode' => YII_ENV_TEST ? 'testme' : null,
-            ],
+            ]
         ];
     }
 
@@ -59,70 +28,90 @@ class SiteController extends Controller
      *
      * @return string
      */
-    public function actionIndex()
-    {
-        return $this->render('index');
-    }
+    public function actionIndex() {
+        $model = new Url();
 
-    /**
-     * Login action.
-     *
-     * @return Response|string
-     */
-    public function actionLogin()
-    {
-        if (!Yii::$app->user->isGuest) {
-            return $this->goHome();
-        }
-
-        $model = new LoginForm();
-        if ($model->load(Yii::$app->request->post()) && $model->login()) {
-            return $this->goBack();
-        }
-
-        $model->password = '';
-        return $this->render('login', [
-            'model' => $model,
+        return $this->render('index', [
+                    'model' => $model
         ]);
     }
 
-    /**
-     * Logout action.
-     *
-     * @return Response
-     */
-    public function actionLogout()
-    {
-        Yii::$app->user->logout();
+    public function actionGenerate() {
+        Yii::$app->response->format = Response::FORMAT_JSON;
 
-        return $this->goHome();
-    }
+        $model = new Url();
+        $model->load(Yii::$app->request->post());
 
-    /**
-     * Displays contact page.
-     *
-     * @return Response|string
-     */
-    public function actionContact()
-    {
-        $model = new ContactForm();
-        if ($model->load(Yii::$app->request->post()) && $model->contact(Yii::$app->params['adminEmail'])) {
-            Yii::$app->session->setFlash('contactFormSubmitted');
+        $this->checkAvailability($model->url);
 
-            return $this->refresh();
+        $existingModel = Url::findOne(['url' => $model->url]);
+
+        if ($existingModel) {
+            $qrCode = new QrCode(Yii::$app->urlManager->createAbsoluteUrl(['site/redirect', 'code' => $existingModel->url_code]));
+            $writer = new PngWriter();
+            $qrData = $writer->write($qrCode)->getString();
+
+            return [
+                'success' => true,
+                'short_url' => Yii::$app->urlManager->createAbsoluteUrl(['site/redirect', 'code' => $existingModel->url_code]),
+                'qr_code' => 'data:image/png;base64,' . base64_encode($qrData),
+                'message' => 'Эта ссылка уже была сокращена ранее'
+            ];
         }
-        return $this->render('contact', [
-            'model' => $model,
-        ]);
+
+
+        $model->url_code = Yii::$app->security->generateRandomString(6);
+
+        if (!$model->validate()) {
+            return [
+                'success' => false,
+                'error' => $model->getFirstError('url') ?: 'Ошибка валидации'
+            ];
+        }
+
+        if (!$model->save()) {
+            $errors = $model->getFirstErrors();
+            return [
+                'success' => false,
+                'error' => 'Ошибка сохранения: ' . reset($errors)
+            ];
+        }
+
+        $qrCode = new QrCode(Yii::$app->urlManager->createAbsoluteUrl(['site/redirect', 'code' => $model->url_code]));
+        $writer = new PngWriter();
+        $qrData = $writer->write($qrCode)->getString();
+
+        return [
+            'success' => true,
+            'short_url' => Yii::$app->urlManager->createAbsoluteUrl(['site/redirect', 'code' => $model->url_code]),
+            'qr_code' => 'data:image/png;base64,' . base64_encode($qrData)
+        ];
     }
 
-    /**
-     * Displays about page.
-     *
-     * @return string
-     */
-    public function actionAbout()
-    {
-        return $this->render('about');
+    public function actionRedirect($code) {
+        $urlModel = Url::findOne(['url_code' => $code]);
+        $urlModel->logAccess(Yii::$app->request->userIP);
+
+        return $this->redirect($urlModel->url);
+    }
+
+    public function checkAvailability($url) {
+        try {
+            $client = new Client();
+            $response = $client->createRequest()
+                    ->setMethod('HEAD')
+                    ->setUrl($url)
+                    ->setOptions([
+                        'timeout' => 8,
+                        'followLocation' => true,
+                        'maxRedirects' => 3
+                    ])
+                    ->send();
+
+            $allowedCodes = array_merge(range(200, 399), [405]);
+            return in_array($response->statusCode, $allowedCodes);
+        } catch (Exception $e) {
+            echo $e;
+        }
     }
 }

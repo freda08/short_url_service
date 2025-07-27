@@ -2,6 +2,9 @@
 
 namespace app\models;
 
+use yii\db\Expression;
+use yii\behaviors\TimestampBehavior;
+
 use Yii;
 
 /**
@@ -32,28 +35,25 @@ class UrlLog extends \yii\db\ActiveRecord
     public function rules()
     {
         return [
-            [['visited_at'], 'default', 'value' => null],
             [['url_id', 'ip_address'], 'required'],
             [['url_id'], 'integer'],
-            [['visited_at'], 'safe'],
             [['ip_address'], 'string', 'max' => 45],
             [['url_id'], 'exist', 'skipOnError' => true, 'targetClass' => Url::class, 'targetAttribute' => ['url_id' => 'id']],
         ];
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function attributeLabels()
+    public function behaviors()
     {
         return [
-            'id' => 'ID',
-            'url_id' => 'Url ID',
-            'ip_address' => 'Ip Address',
-            'visited_at' => 'Visited At',
+            [
+                'class' => TimestampBehavior::class,
+                'createdAtAttribute' => 'visited_at',
+                'updatedAtAttribute' => false,
+                'value' => new Expression('NOW()'),
+            ],
         ];
     }
-
+    
     /**
      * Gets query for [[Url]].
      *

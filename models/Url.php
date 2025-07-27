@@ -3,19 +3,21 @@
 namespace app\models;
 
 use Yii;
+use yii\behaviors\TimestampBehavior;
+use yii\db\ActiveRecord;
+use yii\db\Expression;
 
+use app\models\UrlLog;
 /**
  * This is the model class for table "url".
  *
  * @property int $id
  * @property string $url
- * @property string $url_code
+ * @property string $short_url
  * @property string $created_at
  * @property int|null $visit_count
- *
- * @property UrlLog[] $urlLogs
  */
-class Url extends \yii\db\ActiveRecord
+class Url extends ActiveRecord
 {
 
 
@@ -34,36 +36,34 @@ class Url extends \yii\db\ActiveRecord
     {
         return [
             [['visit_count'], 'default', 'value' => 0],
-            [['url', 'url_code', 'created_at'], 'required'],
-            [['created_at'], 'safe'],
+            [['url', 'url_code'], 'required'],
+            [['url'], 'url', 'validSchemes' => ['http', 'https']],
             [['visit_count'], 'integer'],
             [['url'], 'string', 'max' => 2048],
             [['url_code'], 'string', 'max' => 8],
         ];
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function attributeLabels()
+    public function behaviors()
     {
         return [
-            'id' => 'ID',
-            'url' => 'Url',
-            'url_code' => 'Url Code',
-            'created_at' => 'Created At',
-            'visit_count' => 'Visit Count',
+            [
+                'class' => TimestampBehavior::class,
+                'createdAtAttribute' => 'created_at',
+                'updatedAtAttribute' => false,
+                'value' => new Expression('NOW()'),
+            ],
         ];
     }
-
-    /**
-     * Gets query for [[UrlLogs]].
-     *
-     * @return \yii\db\ActiveQuery
-     */
-    public function getUrlLogs()
+    
+    public function logAccess($ip)
     {
-        return $this->hasMany(UrlLog::class, ['url_id' => 'id']);
-    }
+        $log = new UrlLog();
+        $log->url_id = $this->id;
+        $log->ip_address = $ip;
+        $log->save();
 
+        $this->visit_count++;
+        $this->save(false);
+    }
 }

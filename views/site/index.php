@@ -1,53 +1,75 @@
 <?php
 
-/** @var yii\web\View $this */
+use yii\helpers\Html;
+use yii\bootstrap5\ActiveForm;
 
-$this->title = 'My Yii Application';
+$this->title = 'Сервис коротких ссылок';
 ?>
-<div class="site-index">
 
-    <div class="jumbotron text-center bg-transparent mt-5 mb-5">
-        <h1 class="display-4">Congratulations!</h1>
+<?php $form = ActiveForm::begin(['id' => 'url-form', 'enableClientValidation' => true]); ?>
 
-        <p class="lead">You have successfully created your Yii-powered application.</p>
+<div class="mb-3">
+    <?=
+    $form->field($model, 'url', [
+        'options' => ['class' => 'w-100'],
+        'inputOptions' => [
+            'class' => 'form-control',
+            'placeholder' => 'Введите URL'
+        ],
+        'template' => "{input}\n{error}",
+        'errorOptions' => ['class' => 'invalid-feedback d-block']
+    ])->label(false)
+    ?>
 
-        <p><a class="btn btn-lg btn-success" href="https://www.yiiframework.com">Get started with Yii</a></p>
+    <div class="text-center mt-4">
+        <?=
+        Html::submitButton('Сгенерировать ссылку', [
+            'class' => 'btn btn-primary w-100',
+            'id' => 'submit-btn'
+        ])
+        ?>
     </div>
 
-    <div class="body-content">
-
-        <div class="row">
-            <div class="col-lg-4 mb-3">
-                <h2>Heading</h2>
-
-                <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et
-                    dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip
-                    ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu
-                    fugiat nulla pariatur.</p>
-
-                <p><a class="btn btn-outline-secondary" href="https://www.yiiframework.com/doc/">Yii Documentation &raquo;</a></p>
-            </div>
-            <div class="col-lg-4 mb-3">
-                <h2>Heading</h2>
-
-                <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et
-                    dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip
-                    ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu
-                    fugiat nulla pariatur.</p>
-
-                <p><a class="btn btn-outline-secondary" href="https://www.yiiframework.com/forum/">Yii Forum &raquo;</a></p>
-            </div>
-            <div class="col-lg-4">
-                <h2>Heading</h2>
-
-                <p>Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et
-                    dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip
-                    ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu
-                    fugiat nulla pariatur.</p>
-
-                <p><a class="btn btn-outline-secondary" href="https://www.yiiframework.com/extensions/">Yii Extensions &raquo;</a></p>
-            </div>
-        </div>
-
-    </div>
 </div>
+
+<?php ActiveForm::end(); ?>
+
+<div id="result" class="mt-4" style="display:none; text-align: center">
+    <p>Короткая ссылка: <a id="short-url" target="_blank" href="#"></a></p>
+    <img id="qr-code" src="" alt="QR Code" class="img-thumbnail">
+</div>
+
+<div id="error-alert" class="alert alert-danger mt-3" style="display: none;"></div>
+
+<?php
+$js = <<<JS
+$('#url-form').on('beforeSubmit', function(e) {
+    e.preventDefault();
+    
+    $('#result').hide();
+    $('#result-message').text('');
+        
+    $.ajax({
+        url: '/site/generate',
+        type: 'POST',
+        data: $(this).serialize(),
+        success: function(response) {
+            if (response.success) {
+                $('#short-url').attr('href', response.short_url).text(response.short_url);
+                $('#qr-code').attr('src', response.qr_code);
+                $('#result').show();
+                $('#error-alert').hide();
+            }
+        },
+        error: function(err) {
+            $('#error-alert').text('Произошла ошибка при обработке запроса ' + err.responseJSON.message);
+            $('#error-alert').show();
+        }
+    });
+}).on('submit', function(e) {
+    e.preventDefault();
+});
+JS;
+
+$this->registerJs($js);
+?>
