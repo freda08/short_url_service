@@ -51,7 +51,7 @@ $config = [
             'enablePrettyUrl' => true,
             'showScriptName' => false,
             'rules' => [
-                'r/<code:\w+>' => 'site/redirect',
+                'r/<code:\w+>' => 'redirect/index',
                 'generate' => 'site/generate',
             ],
         ],

@@ -19,8 +19,6 @@ use Yii;
  */
 class UrlLog extends \yii\db\ActiveRecord
 {
-
-
     /**
      * {@inheritdoc}
      */
@@ -63,5 +61,4 @@ class UrlLog extends \yii\db\ActiveRecord
     {
         return $this->hasOne(Url::class, ['id' => 'url_id']);
     }
-
 }

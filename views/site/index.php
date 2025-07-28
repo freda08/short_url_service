@@ -6,7 +6,13 @@ use yii\bootstrap5\ActiveForm;
 $this->title = 'Сервис коротких ссылок';
 ?>
 
-<?php $form = ActiveForm::begin(['id' => 'url-form', 'enableClientValidation' => true]); ?>
+<?php
+$form = ActiveForm::begin([
+        'id' => 'url-form',
+        'enableClientValidation' => true,
+        'enableAjaxValidation' => false
+    ])
+?>
 
 <div class="mb-3">
     <?=
@@ -23,7 +29,7 @@ $this->title = 'Сервис коротких ссылок';
 
     <div class="text-center mt-4">
         <?=
-        Html::submitButton('Сгенерировать ссылку', [
+        Html::submitButton('OK', [
             'class' => 'btn btn-primary w-100',
             'id' => 'submit-btn'
         ])
@@ -59,6 +65,9 @@ $('#url-form').on('beforeSubmit', function(e) {
                 $('#qr-code').attr('src', response.qr_code);
                 $('#result').show();
                 $('#error-alert').hide();
+            } else {
+                $('#error-alert').text(response.error);
+                $('#error-alert').show();
             }
         },
         error: function(err) {

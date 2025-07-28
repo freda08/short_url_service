@@ -31,7 +31,7 @@ class SiteController extends Controller {
         $model = new Url();
 
         return $this->render('index', [
-            'model' => $model
+                    'model' => $model
         ]);
     }
 
@@ -41,7 +41,12 @@ class SiteController extends Controller {
         $model = new Url();
         $model->load(Yii::$app->request->post());
 
-        $this->checkAvailability($model->url);
+        if (!$this->checkAvailability($model->url)) {
+            return [
+                'success' => false,
+                'error' => 'Данный URL не доступен'
+            ];
+        }
 
         $existingModel = Url::findOne(['url' => $model->url]);
 
@@ -69,14 +74,7 @@ class SiteController extends Controller {
         return $this->generateQRData($model->url_code);
     }
 
-    public function actionRedirect($code) {
-        $urlModel = Url::findOne(['url_code' => $code]);
-        $urlModel->logAccess(Yii::$app->request->userIP);
-
-        return $this->redirect($urlModel->url);
-    }
-
-    public function checkAvailability($url) {
+    private function checkAvailability($url) {
         try {
             $client = new Client();
             $response = $client->createRequest()
@@ -91,19 +89,19 @@ class SiteController extends Controller {
 
             $allowedCodes = array_merge(range(200, 399), [405]);
             return in_array($response->statusCode, $allowedCodes);
-        } catch (Exception $e) {
-            echo $e;
+        } catch (\Throwable $e) {
+            return false;
         }
     }
 
-    public function generateQRData($code) {
-        $qrCode = new QrCode(Yii::$app->urlManager->createAbsoluteUrl(['site/redirect', 'code' => $code]));
+    private function generateQRData($code) {
+        $qrCode = new QrCode(Yii::$app->urlManager->createAbsoluteUrl(['redirect/index', 'code' => $code]));
         $writer = new PngWriter();
         $qrData = $writer->write($qrCode)->getString();
 
         return [
             'success' => true,
-            'short_url' => Yii::$app->urlManager->createAbsoluteUrl(['site/redirect', 'code' => $code]),
+            'short_url' => Yii::$app->urlManager->createAbsoluteUrl(['redirect/index', 'code' => $code]),
             'qr_code' => 'data:image/png;base64,' . base64_encode($qrData)
         ];
     }
